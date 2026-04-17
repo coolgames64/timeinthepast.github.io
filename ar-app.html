@@ -7,7 +7,7 @@
     <title>Time in the Past | AR Edition</title>
     
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://rawgit.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@master/aframe/build/aframe-ar.js"></script>
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -181,7 +181,7 @@
     <div class="marker-info">
         <h4>📱 Show Hiro Marker on another screen</h4>
         <p>Open this on your computer:<br>
-        <span class="link">https://rawgit.com/AR-js-org/AR.js/master/data/images/hiro.png</span></p>
+        <span class="link">https://ar-js-org.github.io/AR.js/data/images/hiro.png</span></p>
     </div>
     
     <div class="places">
@@ -422,11 +422,15 @@ function updateMarkerContent() {
         const content = document.getElementById(contentId);
         if (content) {
             content.setAttribute('visible', true);
-            // Animate in
-            content.setAttribute('animation', 'property: scale; from: 0.1 0.1 0.1; to: 1 1 1; dur: 500; easing: easeOutBack');
         }
     }
 }
+
+// Auto-hide instructions after 30 seconds
+setTimeout(() => {
+    const markerInfo = document.querySelector('.marker-info');
+    if (markerInfo) markerInfo.style.opacity = '0.3';
+}, 30000);
 </script>
 
 </body>
