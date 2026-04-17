@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Time in the Past | Manchester AR</title>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #0a0a1a; color: #fff; overflow: hidden; }
+        
+        /* Camera Background */
+        #camera-view {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            z-index: 1;
+            background: #1a1a2e;
+        }
+        
+        /* AR Image Overlay */
+        #ar-overlay {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            max-width: 85%;
+            max-height: 65%;
+            z-index: 3;
+            opacity: 0;
+            transition: opacity 0.8s ease;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 0 60px rgba(0, 245, 212, 0.4);
+        }
+        #ar-overlay.show { opacity: 1; }
+        #ar-overlay img {
+            width: 100%; height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        
+        /* Vintage Sepia Effect */
+        #vintage {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(112, 66, 20, 0.2);
+            mix-blend-mode: sepia;
+            z-index: 4;
+            pointer-events: none;
+        }
+        
+        /* Scan Frame */
+        #scan-frame {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 280px; height: 280px;
+            z-index: 5;
+            pointer-events: none;
+        }
+        .corner { position: absolute; width: 30px; height: 30px; border-color: #00f5d4; }
+        .tl { top: 0; left: 0; border-top: 3px solid; border-left: 3px solid; }
+        .tr { top: 0; right: 0; border-top: 3px solid; border-right: 3px solid; }
+        .bl { bottom: 0; left: 0; border-bottom: 3px solid; border-left: 3px solid; }
+        .br { bottom: 0; right: 0; border-bottom: 3px solid; border-right: 3px solid; }
+        
+        /* Header */
+        #header {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%;
+            background: linear-gradient(180deg, rgba(0,0,0,0.8) 0%, transparent 100%);
+            padding: 15px 20px;
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        #header h1 { font-size: 1.1em; color: #00f5d4; text-shadow: 0 0 10px #00f5d4; }
+        
+        /* GPS Badge */
+        #gps-badge {
+            background: rgba(255,255,255,0.1);
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            border: 1px solid #333;
+        }
+        #gps-badge.active { 
+            background: rgba(0, 245, 212, 0.2); 
+            border-color: #00f5d4;
+            color: #00f5d4;
+        }
+        
+        /* Place Info */
+        #place-info {
+            position: fixed;
+            bottom: 180px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            z-index: 10;
+            background: rgba(0,0,0,0.6);
+            padding: 12px 25px;
+            border-radius: 25px;
+            backdrop-filter: blur(10px);
+        }
+        #place-info .name { font-size: 1.2em; color: #00f5d4; }
+        #place-info .year { font-size: 0.9em; color: #aaa; margin-top: 5px; }
+        
+        /* Control Panel */
+        #control-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            background: linear-gradient(0deg, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.7) 80%, transparent 100%);
+            padding: 20px;
+            z-index: 10;
+        }
+        
+        /* Place Selector */
+        #place-selector {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .place-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            padding: 10px 16px;
+            border-radius: 25px;
+            font-size: 0.85em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .place-btn.active {
+            background: rgba(0, 245, 212, 0.3);
+            border-color: #00f5d4;
+            color: #00f5d4;
+        }
+        .place-btn:active { transform: scale(0.95); }
+        
+        /* Year Selector */
+        #year-selector {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .year-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .year-btn.active {
+            background: rgba(255, 193, 7, 0.3);
+            border-color: #ffc107;
+            color: #ffc107;
+        }
+        .year-btn:active { transform: scale(0.95); }
+        
+        /* Status Bar */
+        #status-bar {
+            text-align: center;
+            font-size: 0.75em;
+            color: #888;
+        }
+        #status-bar span { color: #00f5d4; }
+        
+        /* Demo Button */
+        #demo-btn {
+            position: fixed;
+            top: 60px;
+            right: 15px;
+            background: rgba(255, 193, 7, 0.2);
+            border: 1px solid #ffc107;
+            color: #ffc107;
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            cursor: pointer;
+            z-index: 11;
+        }
+        
+        /* Loading Animation */
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+        .loading { animation: pulse 1.5s infinite; }
+    </style>
+</head>
+<body>
+    
+    <!-- Camera/Background -->
+    <video id="camera-view" autoplay playsinline muted></video>
+    
+    <!-- AR Image Overlay -->
+    <div id="ar-overlay">
+        <img id="ar-image" src="" alt="Historical view">
+    </div>
+    
+    <!-- Vintage Effect -->
+    <div id="vintage"></div>
+    
+    <!-- Scan Frame -->
+    <div id="scan-frame">
+        <div class="corner tl"></div>
+        <div class="corner tr"></div>
+        <div class="corner bl"></div>
+        <div class="corner br"></div>
+    </div>
+    
+    <!-- Header -->
+    <div id="header">
+        <h1>⏳ Time in the Past</h1>
+        <div id="gps-badge">DEMO</div>
+    </div>
+    
+    <!-- Demo Mode Button -->
+    <button id="demo-btn" onclick="startDemo()">DEMO MODE</button>
+    
+    <!-- Place Info -->
+    <div id="place-info">
+        <div class="name" id="place-name">🏛️ Market Place</div>
+        <div class="year" id="place-year">Select a year</div>
+    </div>
+    
+    <!-- Control Panel -->
+    <div id="control-panel">
+        <div id="place-selector">
+            <button class="place-btn active" onclick="selectPlace('market')">🏛️ Market</button>
+            <button class="place-btn" onclick="selectPlace('oldwhitelion')">🦁 White Lion</button>
+            <button class="place-btn" onclick="selectPlace('wellington')">🍺 Wellington</button>
+        </div>
+        <div id="year-selector">
+            <button class="year-btn" onclick="setYear('1875')">1875</button>
+            <button class="year-btn" onclick="setYear('1877')">1877</button>
+            <button class="year-btn" onclick="setYear('2002')">2002</button>
+            <button class="year-btn active" onclick="setYear('now')">LIVE</button>
+        </div>
+        <div id="status-bar">
+            <span id="status-text">DEMO MODE - Tap places and years to see Manchester through time!</span>
+        </div>
+    </div>
+
+<script>
+// State
+let currentPlace = 'market';
+let currentYear = 'now';
+
+// Places data with real historical images
+const places = {
+    market: {
+        name: '🏛️ Market Place',
+        location: 'Manchester City Centre',
+        images: {
+            '1877': 'images/manchester_market_1877.jpg',
+            'now': 'images/manchester_now.jpg'
+        }
+    },
+    oldwhitelion: {
+        name: '🦁 Old White Lion',
+        location: 'Long Millgate, Manchester',
+        images: {
+            '1875': 'images/old_white_lion_1875.jpg',
+            '2002': 'images/old_white_lion_2002.jpg'
+        }
+    },
+    wellington: {
+        name: '🍺 Wellington Inn',
+        location: 'Manchester City Centre',
+        images: {
+            '1877': 'images/wellington_inn_1877.jpg',
+            '2002': 'images/wellington_inn_2002.jpg'
+        }
+    }
+};
+
+// Start app
+async function init() {
+    document.getElementById('gps-badge').classList.add('active');
+    document.getElementById('gps-text').textContent = 'DEMO';
+    
+    // Try to start camera
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
+        });
+        document.getElementById('camera-view').srcObject = stream;
+    } catch (e) {
+        // Camera not available - show dark background
+        document.getElementById('camera-view').style.background = 'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)';
+        document.getElementById('camera-view').style.display = 'block';
+    }
+    
+    // Show default image
+    showHistoricalView();
+}
+
+// Select place
+function selectPlace(place) {
+    currentPlace = place;
+    
+    // Update buttons
+    document.querySelectorAll('.place-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    // Update info
+    document.getElementById('place-name').textContent = places[place].name;
+    
+    // Show view
+    showHistoricalView();
+}
+
+// Set year
+function setYear(year) {
+    currentYear = year;
+    
+    // Update buttons
+    document.querySelectorAll('.year-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    // Update info
+    const yearText = year === 'now' ? 'LIVE Camera' : year + ' 📜';
+    document.getElementById('place-year').textContent = yearText;
+    
+    // Show view
+    showHistoricalView();
+}
+
+// Show historical view
+function showHistoricalView() {
+    const arOverlay = document.getElementById('ar-overlay');
+    const arImage = document.getElementById('ar-image');
+    const place = places[currentPlace];
+    
+    if (currentYear === 'now') {
+        // Show LIVE camera - hide overlay
+        arOverlay.classList.remove('show');
+        document.getElementById('status-text').textContent = 'LIVE view - walk to this location to see the past!';
+    } else if (place.images[currentYear]) {
+        // Show historical image
+        arImage.src = place.images[currentYear];
+        arOverlay.classList.add('show');
+        document.getElementById('status-text').textContent = `${place.location} - ${currentYear} view`;
+    } else {
+        // No image for this year/place combo
+        arOverlay.classList.remove('show');
+        document.getElementById('status-text').textContent = 'No historical photo available for this combination';
+    }
+}
+
+// Demo mode - auto cycle through all combinations
+let demoInterval = null;
+function startDemo() {
+    if (demoInterval) {
+        clearInterval(demoInterval);
+        demoInterval = null;
+        document.getElementById('demo-btn').textContent = 'DEMO MODE';
+        document.getElementById('demo-btn').style.background = 'rgba(255, 193, 7, 0.2)';
+        return;
+    }
+    
+    document.getElementById('demo-btn').textContent = 'STOP DEMO';
+    document.getElementById('demo-btn').style.background = 'rgba(255, 100, 100, 0.3)';
+    
+    const placeKeys = Object.keys(places);
+    const years = ['1875', '1877', '2002', 'now'];
+    let placeIndex = 0;
+    let yearIndex = 0;
+    
+    function nextCombo() {
+        placeIndex = (placeIndex + 1) % placeKeys.length;
+        if (placeIndex === 0) yearIndex = (yearIndex + 1) % years.length;
+        
+        selectPlace(placeKeys[placeIndex]);
+        setTimeout(() => {
+            setYear(years[yearIndex]);
+        }, 300);
+    }
+    
+    demoInterval = setInterval(nextCombo, 3000);
+}
+
+// Init
+init();
+</script>
+</body>
+</html>
