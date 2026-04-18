@@ -4,10 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <title>Time in the Past | AR Edition v2</title>
+    <title>Time in the Past | AR Edition</title>
     
     <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
-    <script src="https://ar-js-org.github.io/AR.js/aframe/build/aframe-ar.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/AR-js-org/AR.js@master/aframe/build/aframe-ar.js"></script>
     
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -214,9 +214,10 @@
         <a-entity id="market-1877" visible="false">
             <a-image
                 src="images/manchester_market_1877.jpg"
-                position="0 0 0"
+                position="0 0.5 0"
                 rotation="-90 0 0"
-                width="10"
+                width="2.5"
+                height="1.8"
             ></a-image>
             <a-text
                 value="Market Place, Manchester 1877"
@@ -232,9 +233,10 @@
         <a-entity id="owl-1875" visible="false">
             <a-image
                 src="images/old_white_lion_1875.jpg"
-                position="0 0 0"
+                position="0 0.5 0"
                 rotation="-90 0 0"
-                width="10"
+                width="2.5"
+                height="1.8"
             ></a-image>
             <a-text
                 value="Old White Lion, 1875"
@@ -250,9 +252,10 @@
         <a-entity id="owl-2002" visible="false">
             <a-image
                 src="images/old_white_lion_2002.jpg"
-                position="0 0 0"
+                position="0 0.5 0"
                 rotation="-90 0 0"
-                width="10"
+                width="2.5"
+                height="1.8"
             ></a-image>
             <a-text
                 value="Old White Lion, 2002"
@@ -268,9 +271,10 @@
         <a-entity id="wellington-1877" visible="false">
             <a-image
                 src="images/wellington_inn_1877.jpg"
-                position="0 0 0"
+                position="0 0.5 0"
                 rotation="-90 0 0"
-                width="10"
+                width="2.5"
+                height="1.8"
             ></a-image>
             <a-text
                 value="The Wellington Inn, 1877"
@@ -286,9 +290,10 @@
         <a-entity id="wellington-2002" visible="false">
             <a-image
                 src="images/wellington_inn_2002.jpg"
-                position="0 0 0"
+                position="0 0.5 0"
                 rotation="-90 0 0"
-                width="10"
+                width="2.5"
+                height="1.8"
             ></a-image>
             <a-text
                 value="The Wellington Inn, 2002"
@@ -323,6 +328,14 @@ const places = {
     wellington: { name: 'The Wellington Inn', desc: 'Beloved pub with Tudor architecture.', years: ['1877', '2002', 'now'] }
 };
 
+const markerImages = {
+    'market-1877': 'market-1877',
+    'owl-1875': 'owl-1875',
+    'owl-2002': 'owl-2002',
+    'wellington-1877': 'wellington-1877',
+    'wellington-2002': 'wellington-2002'
+};
+
 let currentPlace = 'market';
 let currentYear = 'now';
 let markerFound = false;
@@ -330,16 +343,21 @@ let markerFound = false;
 document.querySelector('a-scene').addEventListener('loaded', () => {
     document.getElementById('loading').classList.add('hidden');
     
+    // Listen for marker found/lost
     const marker = document.getElementById('hiro-marker');
     marker.addEventListener('markerFound', () => {
+        console.log('Marker found!');
         markerFound = true;
-        document.getElementById('status').textContent = '✅ Marker found!';
+        document.getElementById('status').textContent = '✅ Marker found! Historical view loading...';
+        document.getElementById('status').style.color = '#00f5d4';
         updateMarkerContent();
     });
     
     marker.addEventListener('markerLost', () => {
+        console.log('Marker lost');
         markerFound = false;
         document.getElementById('status').textContent = '🔍 Looking for marker...';
+        document.getElementById('status').style.color = '#00f5d4';
     });
     
     setTimeout(() => selectPlace('market'), 1000);
@@ -387,6 +405,7 @@ function setYear(year) {
 }
 
 function updateMarkerContent() {
+    // Hide all content
     ['market-1877', 'owl-1875', 'owl-2002', 'wellington-1877', 'wellington-2002', 'live-view'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.setAttribute('visible', false);
@@ -401,9 +420,17 @@ function updateMarkerContent() {
         else if (currentPlace === 'wellington') contentId = 'wellington-' + currentYear;
         
         const content = document.getElementById(contentId);
-        if (content) content.setAttribute('visible', true);
+        if (content) {
+            content.setAttribute('visible', true);
+        }
     }
 }
+
+// Auto-hide instructions after 30 seconds
+setTimeout(() => {
+    const markerInfo = document.querySelector('.marker-info');
+    if (markerInfo) markerInfo.style.opacity = '0.3';
+}, 30000);
 </script>
 
 </body>

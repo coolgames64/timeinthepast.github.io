@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#00f5d4">
+    <meta name="description" content="See what places looked like in the past with AR!">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="images/john_ave_old1.jpg">
+    <title>Time in the Past | Location AR</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; overflow: hidden; background: #000; }
+        
+        #video {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            object-fit: cover;
+        }
+        
+        #overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 0.8s;
+        }
+        #overlay.show { opacity: 1; }
+        
+        #radar {
+            position: fixed;
+            top: 80px;
+            right: 15px;
+            width: 120px; height: 120px;
+            background: rgba(0,0,0,0.6);
+            border-radius: 50%;
+            border: 2px solid rgba(0,245,212,0.5);
+            z-index: 100;
+        }
+        #radar-dot {
+            position: absolute;
+            width: 12px; height: 12px;
+            background: #00f5d4;
+            border-radius: 50%;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 10px #00f5d4;
+        }
+        #radar-ring {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px; height: 20px;
+            border: 2px solid rgba(0,245,212,0.8);
+            border-radius: 50%;
+            animation: radar-pulse 2s infinite;
+        }
+        @keyframes radar-pulse {
+            0% { width: 20px; height: 20px; opacity: 1; }
+            100% { width: 120px; height: 120px; opacity: 0; }
+        }
+        
+        .location-marker {
+            position: absolute;
+            width: 16px; height: 16px;
+            background: #ff6b6b;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 8px #ff6b6b;
+        }
+        .location-marker.near {
+            background: #00ff00;
+            box-shadow: 0 0 15px #00ff00;
+            animation: pulse-big 1s infinite;
+        }
+        @keyframes pulse-big {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.5); }
+        }
+        
+        #loading {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, #0a0a1a, #1a1a2e);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            color: #fff;
+        }
+        #loading.hidden { display: none; }
+        #loading h1 { color: #00f5d4; font-size: 1.5em; margin-bottom: 10px; }
+        #loading p { color: #888; font-size: 0.9em; }
+        
+        .top-ui {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            padding: 15px;
+            padding-top: max(15px, env(safe-area-inset-top));
+            background: linear-gradient(180deg, rgba(0,0,0,0.8), transparent);
+            z-index: 100;
+        }
+        .title { color: #00f5d4; font-weight: bold; font-size: 1.2em; text-align: center; }
+        .status { color: rgba(255,255,255,0.7); font-size: 0.8em; text-align: center; margin-top: 5px; }
+        .status.near { color: #00ff00; font-weight: bold; }
+        
+        .info-card {
+            position: fixed;
+            top: 120px;
+            left: 15px; right: 140px;
+            background: rgba(0,0,0,0.8);
+            border: 1px solid rgba(0,245,212,0.3);
+            border-radius: 15px;
+            padding: 15px;
+            z-index: 100;
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.5s;
+        }
+        .info-card.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .info-card h3 { color: #00f5d4; font-size: 1em; margin-bottom: 5px; }
+        .info-card p { color: #fff; font-size: 0.8em; line-height: 1.4; }
+        .info-card .distance { color: #ff6b6b; font-size: 0.75em; margin-top: 5px; }
+        
+        .ui {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            padding: 15px 10px 25px;
+            background: linear-gradient(0deg, rgba(0,0,0,0.9), transparent);
+            z-index: 100;
+        }
+        
+        .years {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .year-btn {
+            padding: 12px 18px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 20px;
+            color: #fff;
+            font-size: 1em;
+            cursor: pointer;
+            min-width: 60px;
+        }
+        .year-btn.active {
+            background: linear-gradient(135deg, #00f5d4, #00bbaa);
+            color: #000;
+            font-weight: bold;
+        }
+        .year-btn.now {
+            background: rgba(255,255,255,0.15);
+        }
+        .year-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        
+        .hint { color: rgba(255,255,255,0.5); font-size: 0.75em; text-align: center; }
+        
+        .compass {
+            position: fixed;
+            top: 80px;
+            left: 15px;
+            width: 60px; height: 60px;
+            background: rgba(0,0,0,0.6);
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,0.3);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .compass-needle {
+            font-size: 1.5em;
+            color: #ff6b6b;
+            transition: transform 0.3s;
+        }
+        
+        .scan-effect {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px; height: 200px;
+            border: 3px solid rgba(0,245,212,0.5);
+            border-radius: 50%;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 50;
+        }
+        .scan-effect.active {
+            animation: scan-expand 2s infinite;
+        }
+        @keyframes scan-expand {
+            0% { width: 50px; height: 50px; opacity: 1; }
+            100% { width: 300px; height: 300px; opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="loading">
+    <h1>📍 TIME IN THE PAST</h1>
+    <p>Getting your location...</p>
+</div>
+
+<video id="video" autoplay playsinline muted></video>
+<img id="overlay" src="" alt="Historical view">
+<div class="scan-effect" id="scanEffect"></div>
+
+<div class="top-ui">
+    <div class="title">🏛️ LOCATION AR</div>
+    <div class="status" id="status">Scanning for nearby places...</div>
+</div>
+
+<div class="compass">
+    <div class="compass-needle" id="compass">⬆️</div>
+</div>
+
+<div id="radar">
+    <div id="radar-dot"></div>
+    <div id="radar-ring"></div>
+</div>
+
+<div class="info-card" id="infoCard">
+    <h3 id="placeName">Market Place</h3>
+    <p id="placeDesc">Historic Manchester market square</p>
+    <div class="distance" id="distance">-- meters away</div>
+</div>
+
+<div class="ui">
+    <div class="years" id="yearBtns">
+        <button class="year-btn now" id="btnNow" onclick="setYear('now')">📷 LIVE</button>
+        <button class="year-btn" id="btn1875" onclick="setYear('1875')" disabled>1875</button>
+        <button class="year-btn" id="btn1877" onclick="setYear('1877')" disabled>1877</button>
+        <button class="year-btn" id="btn2002" onclick="setYear('2002')" disabled>2002</button>
+        <button class="year-btn" id="btnOld1" onclick="setYear('old1')" disabled style="display:none">📷 Old 1</button>
+        <button class="year-btn" id="btnOld2" onclick="setYear('old2')" disabled style="display:none">📷 Old 2</button>
+    </div>
+    <button class="year-btn" id="btnMyHouse" onclick="goToMyHouse()" style="background:rgba(255,200,100,0.3); border-color: #ffc800; margin-top:10px;">🏠 My House</button>
+    <div class="hint">Walk to a building to unlock historical views!</div>
+</div>
+
+<script>
+// Manchester locations with GPS coordinates
+const locations = {
+    johnAve: {
+        name: "John Avenue, Cheadle",
+        desc: "Your home! What did this street look like in the past?",
+        lat: 53.3899,
+        lng: -2.2086,
+        images: {
+            old1: 'images/john_ave_old1.jpg',
+            old2: 'images/john_ave_old2.jpg',
+            now: 'images/manchester_now.jpg'
+        }
+    },
+    market: {
+        name: "Market Place",
+        desc: "Historic market square, Manchester's oldest trading area since Roman times",
+        lat: 53.4808,
+        lng: -2.2426,
+        images: {
+            1877: 'images/manchester_market_1877.jpg',
+            now: 'images/manchester_now.jpg'
+        }
+    },
+    oldwhitelion: {
+        name: "Old White Lion",
+        desc: "Victorian pub on Long Millgate, demolished in the 20th century",
+        lat: 53.4810,
+        lng: -2.2415,
+        images: {
+            1875: 'images/old_white_lion_1875.jpg',
+            2002: 'images/old_white_lion_2002.jpg',
+            now: 'images/old_white_lion_2002.jpg'
+        }
+    },
+    wellington: {
+        name: "The Wellington Inn",
+        desc: "Tudor-style coaching inn on Millgate, rebuilt and restored over centuries",
+        lat: 53.4809,
+        lng: -2.2418,
+        images: {
+            1877: 'images/wellington_inn_1877.jpg',
+            2002: 'images/wellington_inn_2002.jpg',
+            now: 'images/wellington_inn_2002.jpg'
+        }
+    }
+};
+
+const video = document.getElementById('video');
+const overlay = document.getElementById('overlay');
+const loading = document.getElementById('loading');
+const status = document.getElementById('status');
+const infoCard = document.getElementById('infoCard');
+const placeName = document.getElementById('placeName');
+const placeDesc = document.getElementById('placeDesc');
+const distanceEl = document.getElementById('distance');
+const scanEffect = document.getElementById('scanEffect');
+const compass = document.getElementById('compass');
+
+let currentYear = 'now';
+let nearbyLocation = null;
+let watchId = null;
+
+async function initCamera() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
+        });
+        video.srcObject = stream;
+    } catch (err) {
+        console.error('Camera error:', err);
+    }
+}
+
+function getLocation() {
+    if (!navigator.geolocation) {
+        status.textContent = 'GPS not supported!';
+        loading.classList.add('hidden');
+        return;
+    }
+    
+    loading.querySelector('p').textContent = 'Finding your location...';
+    
+    watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+            const userLat = pos.coords.latitude;
+            const userLng = pos.coords.longitude;
+            
+            loading.classList.add('hidden');
+            status.textContent = 'Move around to find historic places!';
+            
+            // Update radar dot position (simplified)
+            updateRadar(userLat, userLng);
+            
+            // Check proximity to each location
+            checkNearby(userLat, userLng);
+            
+            // Update compass
+            updateCompass();
+        },
+        (err) => {
+            status.textContent = 'Location error: ' + err.message;
+            loading.classList.add('hidden');
+            // Try anyway with default location
+            checkNearby(53.4808, -2.2426);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+}
+
+function updateRadar(lat, lng) {
+    // Simplified - just show dot in center for demo
+    // Real implementation would calculate position relative to landmarks
+}
+
+function updateCompass() {
+    // Get device orientation for compass
+    if (window.DeviceOrientationEvent) {
+        window.addEventListener('deviceorientation', (e) => {
+            if (e.alpha !== null) {
+                let deg = Math.round(e.alpha);
+                compass.style.transform = `rotate(${deg}deg)`;
+            }
+        });
+    }
+}
+
+function checkNearby(userLat, userLng) {
+    const DETECTION_RADIUS = 500; // meters - increased for easier detection
+    let closest = null;
+    let closestDist = Infinity;
+    
+    for (const [key, loc] of Object.entries(locations)) {
+        const dist = calculateDistance(userLat, userLng, loc.lat, loc.lng);
+        
+        if (dist < DETECTION_RADIUS && dist < closestDist) {
+            closest = key;
+            closestDist = dist;
+        }
+        
+        // Update location markers on radar
+        updateLocationMarker(key, loc, dist);
+    }
+    
+    if (closest && closest !== nearbyLocation) {
+        // New location detected!
+        nearbyLocation = closest;
+        showLocationInfo(closest, closestDist);
+        status.textContent = '🏛️ ' + locations[closest].name + ' DETECTED!';
+        status.classList.add('near');
+        scanEffect.classList.add('active');
+        
+        // Enable year buttons
+        enableYearButtons(closest);
+    } else if (closest) {
+        // Still at same location
+        distanceEl.textContent = Math.round(closestDist) + ' meters away';
+    } else if (nearbyLocation) {
+        // Left the location
+        nearbyLocation = null;
+        status.textContent = 'Move around to find historic places...';
+        status.classList.remove('near');
+        infoCard.classList.remove('show');
+        scanEffect.classList.remove('active');
+        disableYearButtons();
+    }
+}
+
+function updateLocationMarker(key, loc, dist) {
+    let marker = document.getElementById('marker-' + key);
+    if (!marker) {
+        marker = document.createElement('div');
+        marker.id = 'marker-' + key;
+        marker.className = 'location-marker';
+        document.getElementById('radar').appendChild(marker);
+    }
+    
+    // Position marker on radar based on direction (simplified)
+    const angle = Math.atan2(loc.lng, loc.lat);
+    const radius = 40; // pixels from center
+    const x = 60 + Math.sin(angle) * radius;
+    const y = 60 - Math.cos(angle) * radius;
+    marker.style.left = x + 'px';
+    marker.style.top = y + 'px';
+    
+    if (dist < 100) {
+        marker.classList.add('near');
+    } else {
+        marker.classList.remove('near');
+    }
+}
+
+function showLocationInfo(key, dist) {
+    const loc = locations[key];
+    placeName.textContent = loc.name;
+    placeDesc.textContent = loc.desc;
+    distanceEl.textContent = Math.round(dist) + ' meters away';
+    infoCard.classList.add('show');
+}
+
+function enableYearButtons(locationKey) {
+    const loc = locations[locationKey];
+    
+    // Hide all custom buttons first
+    document.getElementById('btn1875').style.display = 'none';
+    document.getElementById('btn1877').style.display = 'none';
+    document.getElementById('btn2002').style.display = 'none';
+    document.getElementById('btnOld1').style.display = 'none';
+    document.getElementById('btnOld2').style.display = 'none';
+    
+    // Check for Manchester locations (numeric years)
+    if (loc.images[1875]) {
+        document.getElementById('btn1875').style.display = 'inline-block';
+        document.getElementById('btn1875').disabled = false;
+    }
+    if (loc.images[1877]) {
+        document.getElementById('btn1877').style.display = 'inline-block';
+        document.getElementById('btn1877').disabled = false;
+    }
+    if (loc.images[2002]) {
+        document.getElementById('btn2002').style.display = 'inline-block';
+        document.getElementById('btn2002').disabled = false;
+    }
+    
+    // Check for John Avenue (custom old photos)
+    if (loc.images['old1']) {
+        document.getElementById('btnOld1').style.display = 'inline-block';
+        document.getElementById('btnOld1').disabled = false;
+    }
+    if (loc.images['old2']) {
+        document.getElementById('btnOld2').style.display = 'inline-block';
+        document.getElementById('btnOld2').disabled = false;
+    }
+}
+
+function disableYearButtons() {
+    document.getElementById('btn1875').disabled = true;
+    document.getElementById('btn1877').disabled = true;
+    document.getElementById('btn2002').disabled = true;
+    document.getElementById('btnOld1').disabled = true;
+    document.getElementById('btnOld2').disabled = true;
+}
+
+function setYear(year) {
+    currentYear = year;
+    
+    document.querySelectorAll('.year-btn').forEach(b => b.classList.remove('active'));
+    // Find and activate the correct button
+    const btnMap = {
+        'now': 'btnNow',
+        '1875': 'btn1875', 
+        '1877': 'btn1877',
+        '2002': 'btn2002',
+        'old1': 'btnOld1',
+        'old2': 'btnOld2'
+    };
+    if (btnMap[year]) {
+        document.getElementById(btnMap[year]).classList.add('active');
+    }
+    
+    if (year === 'now' || !nearbyLocation) {
+        overlay.classList.remove('show');
+    } else {
+        const loc = locations[nearbyLocation];
+        const imgSrc = loc.images[year];
+        if (imgSrc) {
+            overlay.src = imgSrc;
+            overlay.classList.add('show');
+        }
+    }
+}
+
+// Manual function to go to My House without GPS
+function goToMyHouse() {
+    nearbyLocation = 'johnAve';
+    enableYearButtons('johnAve');
+    showLocationInfo('johnAve');
+    // Auto-show the first old photo
+    if (locations.johnAve.images.old1) {
+        setYear('old1');
+    }
+}
+
+// Calculate distance between two GPS coordinates (Haversine formula)
+function calculateDistance(lat1, lng1, lat2, lng2) {
+    const R = 6371000; // Earth's radius in meters
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng/2) * Math.sin(dLng/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+}
+
+initCamera();
+getLocation();
+</script>
+
+</body>
+</html>

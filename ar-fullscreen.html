@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Time in the Past | Full AR Screen</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; overflow: hidden; background: #000; }
+        
+        #video {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            object-fit: cover;
+        }
+        
+        #overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        #overlay.show { opacity: 1; }
+        
+        #loading {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, #0a0a1a, #1a1a2e);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            color: #fff;
+        }
+        #loading.hidden { display: none; }
+        #loading h1 { color: #00f5d4; font-size: 1.5em; margin-bottom: 10px; }
+        #loading p { color: #888; font-size: 0.9em; }
+        
+        .ui {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            padding: 15px 10px 25px;
+            background: linear-gradient(0deg, rgba(0,0,0,0.9), transparent);
+            z-index: 100;
+        }
+        
+        .places {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .place-btn {
+            padding: 10px 14px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 15px;
+            color: #fff;
+            font-size: 0.8em;
+            cursor: pointer;
+        }
+        .place-btn.active {
+            background: rgba(155,89,182,0.5);
+            border-color: #9b59b6;
+        }
+        
+        .years {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+        }
+        .year-btn {
+            padding: 12px 18px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 20px;
+            color: #fff;
+            font-size: 1em;
+            cursor: pointer;
+            min-width: 60px;
+        }
+        .year-btn.active {
+            background: linear-gradient(135deg, #00f5d4, #00bbaa);
+            color: #000;
+            font-weight: bold;
+        }
+        
+        .year-btn.now {
+            background: rgba(255,255,255,0.15);
+        }
+        
+        .top-ui {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            padding: 15px;
+            padding-top: max(15px, env(safe-area-inset-top));
+            background: linear-gradient(180deg, rgba(0,0,0,0.7), transparent);
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .title { color: #00f5d4; font-weight: bold; font-size: 1em; }
+        .hint { color: rgba(255,255,255,0.6); font-size: 0.7em; text-align: center; flex: 1; }
+        
+        .camera-btn {
+            position: fixed;
+            bottom: 130px;
+            right: 20px;
+            width: 60px; height: 60px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            border: 2px solid #fff;
+            cursor: pointer;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5em;
+        }
+        
+        .opacity-slider {
+            position: fixed;
+            bottom: 140px;
+            left: 15px;
+            z-index: 100;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            color: #fff;
+            font-size: 0.7em;
+            background: rgba(0,0,0,0.5);
+            padding: 8px 5px;
+            border-radius: 10px;
+        }
+        .opacity-slider input {
+            writing-mode: horizontal-tb;
+            margin-top: 5px;
+            transform: rotate(-90deg);
+        }
+    </style>
+</head>
+<body>
+
+<div id="loading">
+    <h1>⏱ TIME IN THE PAST</h1>
+    <p>Starting camera...</p>
+</div>
+
+<video id="video" autoplay playsinline muted></video>
+<img id="overlay" src="" alt="Historical view">
+
+<div class="top-ui">
+    <div class="title">⏱ FULL AR</div>
+    <div class="hint" id="hint">Tap a place & year to see the past!</div>
+</div>
+
+<button class="camera-btn" id="snapBtn">📸</button>
+
+<div class="opacity-slider">
+    🕰️
+    <input type="range" id="opacitySlider" min="30" max="100" value="90">
+</div>
+
+<div class="ui">
+    <div class="places" id="placeBtns">
+        <button class="place-btn active" onclick="selectPlace('market')">🏛️ Market</button>
+        <button class="place-btn" onclick="selectPlace('oldwhitelion')">🦁 White Lion</button>
+        <button class="place-btn" onclick="selectPlace('wellington')">🍺 Wellington</button>
+    </div>
+    <div class="years" id="yearBtns">
+        <button class="year-btn now active" onclick="setYear('now')">LIVE</button>
+        <button class="year-btn" onclick="setYear('1875')">1875</button>
+        <button class="year-btn" onclick="setYear('1877')">1877</button>
+        <button class="year-btn" onclick="setYear('2002')">2002</button>
+    </div>
+</div>
+
+<script>
+const video = document.getElementById('video');
+const overlay = document.getElementById('overlay');
+const loading = document.getElementById('loading');
+const hint = document.getElementById('hint');
+
+const images = {
+    market: {
+        now: null,
+        1875: 'images/manchester_now.jpg',
+        1877: 'images/manchester_market_1877.jpg'
+    },
+    oldwhitelion: {
+        now: null,
+        1875: 'images/old_white_lion_1875.jpg',
+        1877: 'images/old_white_lion_2002.jpg',
+        2002: 'images/old_white_lion_2002.jpg'
+    },
+    wellington: {
+        now: null,
+        1877: 'images/wellington_inn_1877.jpg',
+        2002: 'images/wellington_inn_2002.jpg'
+    }
+};
+
+const descriptions = {
+    market: 'Market Place, Manchester',
+    oldwhitelion: 'Old White Lion, Long Millgate',
+    wellington: 'The Wellington Inn'
+};
+
+const yearLabels = {
+    now: 'LIVE CAMERA',
+    1875: 'Victorian Era 1875',
+    1877: 'Victorian Era 1877',
+    2002: 'Early 2000s'
+};
+
+let currentPlace = 'market';
+let currentYear = 'now';
+
+async function initCamera() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+        });
+        video.srcObject = stream;
+        loading.classList.add('hidden');
+    } catch (err) {
+        console.error('Camera error:', err);
+        loading.innerHTML = '<h1>📷 Camera Needed</h1><p>Please allow camera access</p>';
+    }
+}
+
+function selectPlace(place) {
+    currentPlace = place;
+    document.querySelectorAll('.place-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    updateOverlay();
+}
+
+function setYear(year) {
+    currentYear = year;
+    document.querySelectorAll('.year-btn').forEach(b => {
+        b.classList.toggle('active', b.textContent === (year === 'now' ? 'LIVE' : year));
+    });
+    updateOverlay();
+}
+
+function updateOverlay() {
+    hint.textContent = descriptions[currentPlace] + ' - ' + yearLabels[currentYear];
+    
+    if (currentYear === 'now') {
+        overlay.classList.remove('show');
+    } else {
+        const imgSrc = images[currentPlace][currentYear];
+        if (imgSrc) {
+            overlay.src = imgSrc;
+            overlay.classList.add('show');
+        }
+    }
+}
+
+// Opacity slider
+document.getElementById('opacitySlider').addEventListener('input', (e) => {
+    overlay.style.opacity = e.target.value / 100;
+});
+
+// Snap photo
+document.getElementById('snapBtn').addEventListener('click', () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0);
+    if (overlay.classList.contains('show')) {
+        ctx.globalAlpha = parseFloat(overlay.style.opacity) || 0.9;
+        ctx.drawImage(overlay, 0, 0);
+    }
+    const link = document.createElement('a');
+    link.download = 'time-travel-' + Date.now() + '.jpg';
+    link.href = canvas.toDataURL('image/jpeg', 0.9);
+    link.click();
+});
+
+initCamera();
+</script>
+
+</body>
+</html>

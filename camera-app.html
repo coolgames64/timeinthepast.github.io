@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>Time in the Past | Camera View</title>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; overflow: hidden; background: #000; }
+        
+        #camera {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+        }
+        
+        #overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 0.5s;
+        }
+        #overlay.show { opacity: 1; }
+        
+        .ui {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            padding: 15px;
+            padding-top: max(15px, env(safe-area-inset-top));
+            background: linear-gradient(180deg, rgba(0,0,0,0.7), transparent);
+            z-index: 100;
+        }
+        
+        .top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .title { 
+            color: #00f5d4; 
+            font-size: 1.1em; 
+            font-weight: bold;
+        }
+        
+        .opacity-slider {
+            width: 100%;
+            margin: 10px 0;
+        }
+        
+        .info {
+            background: rgba(0,0,0,0.8);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 10px;
+        }
+        .info h3 { color: #fff; font-size: 1em; margin-bottom: 5px; }
+        .info p { color: #aaa; font-size: 0.8em; }
+        .info .year { color: #00f5d4; font-size: 1.2em; font-weight: bold; }
+        
+        .places {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+        }
+        .place-btn {
+            padding: 10px 15px;
+            background: rgba(255,255,255,0.15);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 20px;
+            color: #fff;
+            font-size: 0.85em;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+        .place-btn.active {
+            background: rgba(0,245,212,0.3);
+            border-color: #00f5d4;
+        }
+        
+        .years {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            background: linear-gradient(0deg, rgba(0,0,0,0.9), transparent);
+            padding: 15px;
+            padding-bottom: max(15px, env(safe-area-inset-bottom));
+            z-index: 100;
+        }
+        
+        .years-label {
+            color: #555;
+            font-size: 0.7em;
+            letter-spacing: 2px;
+            margin-bottom: 8px;
+        }
+        
+        .years-btns {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+        }
+        
+        .year-btn {
+            padding: 12px 18px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 20px;
+            color: #fff;
+            font-size: 1em;
+            cursor: pointer;
+        }
+        .year-btn.active {
+            background: linear-gradient(135deg, #00f5d4, #00bbaa);
+            color: #000;
+            font-weight: bold;
+        }
+        
+        #camera-error {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: #fff;
+            text-align: center;
+            display: none;
+        }
+        #camera-error.show { display: block; }
+        #camera-error h2 { color: #ff6b6b; margin-bottom: 10px; }
+        #camera-error p { color: #888; }
+        
+        .slider-container {
+            background: rgba(0,0,0,0.7);
+            padding: 10px 15px;
+            border-radius: 10px;
+            margin-top: 10px;
+        }
+        .slider-container label {
+            color: #fff;
+            font-size: 0.75em;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .slider-container input {
+            width: 100%;
+            -webkit-appearance: none;
+            height: 5px;
+            border-radius: 5px;
+            background: rgba(255,255,255,0.2);
+        }
+        .slider-container input::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 20px; height: 20px;
+            border-radius: 50%;
+            background: #00f5d4;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div id="camera-error">
+    <h2>📷 Camera Access Needed</h2>
+    <p>Please allow camera access when prompted<br>and reload the page</p>
+</div>
+
+<video id="camera" autoplay playsinline></video>
+<img id="overlay" src="" alt="Historical overlay">
+
+<div class="ui">
+    <div class="top">
+        <div class="title">⏱ TIME IN THE PAST</div>
+    </div>
+    
+    <div class="info" id="info">
+        <div class="year" id="yearTag">LIVE CAMERA</div>
+        <h3 id="placeName">Point at a Manchester landmark</h3>
+        <p id="placeDesc">Select a place and year below</p>
+    </div>
+    
+    <div class="places" id="places">
+        <button class="place-btn active" onclick="selectPlace('market')">🏛️ Market Place</button>
+        <button class="place-btn" onclick="selectPlace('oldwhitelion')">🦁 White Lion</button>
+        <button class="place-btn" onclick="selectPlace('wellington')">🍺 Wellington</button>
+    </div>
+    
+    <div class="slider-container">
+        <label>Historical Image Opacity</label>
+        <input type="range" class="opacity-slider" id="opacitySlider" min="0" max="100" value="80" oninput="updateOpacity(this.value)">
+    </div>
+</div>
+
+<div class="years">
+    <div class="years-label">SELECT TIME PERIOD</div>
+    <div class="years-btns" id="yearBtns">
+        <button class="year-btn" onclick="setYear('1875')">1875</button>
+        <button class="year-btn" onclick="setYear('1877')">1877</button>
+        <button class="year-btn active" onclick="setYear('now')">📷 LIVE</button>
+    </div>
+</div>
+
+<script>
+const places = {
+    market: { 
+        name: 'Market Place, Manchester', 
+        desc: 'Historic Victorian market square',
+        years: {
+            '1877': 'images/manchester_market_1877.jpg',
+            'now': null
+        }
+    },
+    oldwhitelion: { 
+        name: 'Old White Lion, Long Millgate', 
+        desc: 'Tudor-style inn on Manchester\'s oldest street',
+        years: {
+            '1875': 'images/old_white_lion_1875.jpg',
+            '2002': 'images/old_white_lion_2002.jpg',
+            'now': null
+        }
+    },
+    wellington: { 
+        name: 'The Wellington Inn', 
+        desc: 'Beloved Tudor pub since 1800s',
+        years: {
+            '1877': 'images/wellington_inn_1877.jpg',
+            '2002': 'images/wellington_inn_2002.jpg',
+            'now': null
+        }
+    }
+};
+
+let currentPlace = 'market';
+let currentYear = 'now';
+const video = document.getElementById('camera');
+const overlay = document.getElementById('overlay');
+const cameraError = document.getElementById('camera-error');
+
+// Start camera
+async function startCamera() {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: 'environment' }
+        });
+        video.srcObject = stream;
+        cameraError.classList.remove('show');
+    } catch (err) {
+        console.error('Camera error:', err);
+        cameraError.classList.add('show');
+    }
+}
+
+function selectPlace(key) {
+    currentPlace = key;
+    const place = places[key];
+    
+    document.querySelectorAll('.place-btn').forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    document.getElementById('placeName').textContent = place.name;
+    document.getElementById('placeDesc').textContent = place.desc;
+    
+    updateYearButtons();
+    updateOverlay();
+}
+
+function updateYearButtons() {
+    const place = places[currentPlace];
+    const container = document.getElementById('yearBtns');
+    container.innerHTML = '';
+    
+    Object.keys(place.years).forEach(year => {
+        const btn = document.createElement('button');
+        btn.className = 'year-btn' + (year === currentYear ? ' active' : '');
+        btn.textContent = year === 'now' ? '📷 LIVE' : year;
+        btn.onclick = () => setYear(year);
+        container.appendChild(btn);
+    });
+}
+
+function setYear(year) {
+    currentYear = year;
+    
+    document.querySelectorAll('.year-btn').forEach(b => {
+        b.classList.toggle('active', b.textContent === (year === 'now' ? '📷 LIVE' : year));
+    });
+    
+    document.getElementById('yearTag').textContent = year === 'now' ? 'LIVE CAMERA' : year + ' - Historical View';
+    
+    updateOverlay();
+}
+
+function updateOverlay() {
+    const place = places[currentPlace];
+    const imagePath = place.years[currentYear];
+    
+    if (imagePath) {
+        overlay.src = imagePath;
+        overlay.classList.add('show');
+        document.getElementById('opacitySlider').parentElement.style.display = 'block';
+    } else {
+        overlay.classList.remove('show');
+        document.getElementById('opacitySlider').parentElement.style.display = 'none';
+    }
+}
+
+function updateOpacity(value) {
+    overlay.style.opacity = value / 100;
+}
+
+// Initialize
+startCamera();
+updateYearButtons();
+</script>
+
+</body>
+</html>

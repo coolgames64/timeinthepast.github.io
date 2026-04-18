@@ -1,0 +1,18 @@
+{
+  "name": "Time in the Past",
+  "short_name": "TimePast",
+  "description": "See what places looked like in the past with AR!",
+  "start_url": "/ar-location.html",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#00f5d4",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "images/john_ave_old1.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}
